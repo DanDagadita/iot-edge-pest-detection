@@ -1,0 +1,16 @@
+services:
+  runtime:
+    image: europe-docker.pkg.dev/colab-images/public/runtime
+    ports:
+      - "127.0.0.1:9000:8080"
+    volumes:
+      - ./jupyter_config.py:/root/.jupyter/jupyter_notebook_config.py:ro
+      - ./data:/content/data:ro
+      - ./src:/content/src
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

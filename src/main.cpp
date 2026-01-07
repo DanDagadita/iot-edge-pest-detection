@@ -1,45 +1,42 @@
 #include <Arduino.h>
 
-const int DIGITAL_PIN = 32;
-const int LED_PIN = 2;
-const int WINDOW_MS = 10;
+// Switch mode here:
+// Comment out the one you don't want to use.
+//#define MODE_COLLECT  // Use this to record CSV data for training
+#define MODE_DETECT // Use this to run the AI and detect pests
 
-unsigned long last_window_time = 0;
+constexpr int DIGITAL_PIN = 32;
+constexpr int LED_PIN = 2;
+constexpr int WINDOW_MS = 10;
 
-int high_count = 0;
-int total_count = 0;
+#ifdef MODE_COLLECT
+    #include "Collector.h"
+#endif
+
+#ifdef MODE_DETECT
+    #include "Detector.h"
+#endif
 
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
+    pinMode(DIGITAL_PIN, INPUT);
+    pinMode(LED_PIN, OUTPUT);
 
-  pinMode(DIGITAL_PIN, INPUT);
-  pinMode(LED_PIN, OUTPUT);
+    #ifdef MODE_COLLECT
+        Collector::setup();
+    #endif
 
-  Serial.println("timestamp_ms,intensity");
+    #ifdef MODE_DETECT
+        Detector::setup();
+    #endif
 }
 
 void loop() {
-  int val = digitalRead(DIGITAL_PIN);
+    #ifdef MODE_COLLECT
+        Collector::run(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+    #endif
 
-  if (val == HIGH) {
-    high_count++;
-  }
-
-  total_count++;
-
-  unsigned long now = millis();
-  if (now - last_window_time >= WINDOW_MS) {
-
-    float intensity = (float)high_count / total_count * 100.0;
-
-    Serial.print(now);
-    Serial.print(",");
-    Serial.println(intensity, 2);
-
-    analogWrite(LED_PIN, (int)(intensity * 2.55)); 
-
-    high_count = 0;
-    total_count = 0;
-    last_window_time = now;
-  }
+    #ifdef MODE_DETECT
+        Detector::run(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+    #endif
 }
