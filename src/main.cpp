@@ -1,9 +1,8 @@
 #include <Arduino.h>
 
 // Switch mode here:
-// Comment out the one you don't want to use.
-//#define MODE_COLLECT  // Use this to record CSV data for training
-#define MODE_DETECT // Use this to run the AI and detect pests
+//#define MODE_COLLECT  
+#define MODE_DETECT 
 
 constexpr int DIGITAL_PIN = 32;
 constexpr int LED_PIN = 2;
@@ -14,6 +13,7 @@ constexpr int WINDOW_MS = 10;
 #endif
 
 #ifdef MODE_DETECT
+    #include "Config.h"
     #include "Detector.h"
 #endif
 
@@ -27,6 +27,7 @@ void setup() {
     #endif
 
     #ifdef MODE_DETECT
+        Config::setup();
         Detector::setup();
     #endif
 }
@@ -37,6 +38,9 @@ void loop() {
     #endif
 
     #ifdef MODE_DETECT
-        Detector::run(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+        Config::loop();
+        if (Config::connection_success) {
+            Detector::run(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+        }
     #endif
 }

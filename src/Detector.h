@@ -5,7 +5,7 @@
 
 #include <EloquentTinyML.h>
 
-#include "rat_model.h"
+#include "pest_model.h"
 
 #define NUMBER_OF_INPUTS 100
 #define NUMBER_OF_OUTPUTS 1
@@ -25,7 +25,7 @@ namespace Detector {
             input_buffer[i] = 0.0f;
         }
 
-        if (!ml.begin(rat_model_tflite)) {
+        if (!ml.begin(pest_model_tflite)) {
             Serial.println("Error, could not initialize model");
             while (1);
         }
