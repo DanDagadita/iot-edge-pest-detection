@@ -14,6 +14,7 @@ constexpr int WINDOW_MS = 10;
 
 #ifdef MODE_DETECT
     #include "Config.h"
+    #include "MqttHandler.h"
     #include "Detector.h"
 #endif
 
@@ -28,7 +29,11 @@ void setup() {
 
     #ifdef MODE_DETECT
         Config::setup();
+        MqttHandler::setup();
         Detector::setup();
+        Detector::onDetection = MqttHandler::handleDetection;
+        MqttHandler::onCallback = Detector::handleCallback;
+        Config::onConfigChange = MqttHandler::handleConfigChange;
     #endif
 }
 
@@ -40,7 +45,10 @@ void loop() {
     #ifdef MODE_DETECT
         Config::loop();
         if (Config::connection_success) {
-            Detector::run(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+            MqttHandler::loop();
+            if (MqttHandler::connection_success) {
+                Detector::loop(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+            }
         }
     #endif
 }

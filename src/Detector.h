@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include <EloquentTinyML.h>
+#include <ArduinoJson.h>
 
 #include "pest_model.h"
 
@@ -14,6 +15,8 @@
 namespace Detector {
     Eloquent::TinyML::TfLite<NUMBER_OF_INPUTS, NUMBER_OF_OUTPUTS, TENSOR_ARENA_SIZE> ml;
 
+    float threshold = 0.9;
+    void (*onDetection)(float, float) = nullptr;
     float input_buffer[NUMBER_OF_INPUTS];
     unsigned long last_window_time = 0;
     int high_count = 0;
@@ -32,7 +35,7 @@ namespace Detector {
         Serial.println("Pest detector ready!");
     }
 
-    void run(int digitalPin, int ledPin, int windowMs) {
+    void loop(int digitalPin, int ledPin, int windowMs) {
         if (digitalRead(digitalPin) == HIGH) {
             high_count++;
         }
@@ -56,9 +59,12 @@ namespace Detector {
                 Serial.print("% Pest probability: ");
                 Serial.println(prediction, 4);
 
-                if (prediction > 0.9) {
+                if (prediction > threshold) {
                     Serial.println("##### PEST DETECTED! ####");
                     digitalWrite(ledPin, HIGH);
+                    if (onDetection != nullptr) {
+                        onDetection(prediction, intensity);
+                    }
                 } else {
                     analogWrite(ledPin, (int)(intensity * 255.0));
                 }
@@ -68,6 +74,13 @@ namespace Detector {
             high_count = 0;
             total_count = 0;
             last_window_time = now;
+        }
+    }
+
+    void handleCallback(JsonDocument doc) {
+        if (doc["threshold"].is<float>()) {
+            threshold = doc["threshold"];
+            Serial.printf("[Config] Updated threshold to: %.2f\n", threshold);
         }
     }
 }

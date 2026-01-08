@@ -21,18 +21,18 @@ namespace Config {
     };
 
     ConfigParam params[] = {
-        {"mqtt_server",   "MQTT Server",   40, "", NULL},
-        {"mqtt_port",     "MQTT Port",     6,  "", NULL},
-        {"mqtt_username", "MQTT Username", 40, "", NULL},
-        {"mqtt_password", "MQTT Password", 40, "", NULL},
-        {"mqtt_topic",    "MQTT Topic",    40, "", NULL},
-        {"user_token",    "User Token",    64, "", NULL}
+        {"mqtt_server", "MQTT Server", 40, "", nullptr},
+        {"mqtt_port", "MQTT Port", 6, "", nullptr},
+        {"mqtt_username", "MQTT Username", 40, "", nullptr},
+        {"mqtt_password", "MQTT Password", 40, "", nullptr},
+        {"user_token", "User Token", 64, "", nullptr}
     };
-    
+
     const int paramCount = sizeof(params) / sizeof(params[0]);
     Preferences preferences;
     WiFiManager wm;
     bool connection_success = false;
+    void (*onConfigChange)() = nullptr;
 
     // Helper to get value by key later in Detector.h
     const char* get(const char* key) {
@@ -51,6 +51,9 @@ namespace Config {
             preferences.putString(params[i].key, params[i].value);
         }
         preferences.end();
+        if (onConfigChange != nullptr) {
+            onConfigChange();
+        }
         Serial.println("[Config] Settings Saved.");
     }
 
@@ -73,19 +76,21 @@ namespace Config {
         wm.setMenu(menu, 6);
         wm.setShowInfoUpdate(false);
         wm.setShowInfoErase(false);
+        wm.setTitle(AP_TITLE);
 
         // WiFiManager config
-        wm.setConfigPortalBlocking(true);
+        wm.setConfigPortalBlocking(true); // block everything until after the connection is completed
         wm.setSaveParamsCallback(saveParamsCallback);
         wm.setConnectTimeout(TIMEOUT);
         wm.setAPStaticIPConfig(IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_MASK));
-        wm.setTitle(AP_TITLE);
+        wm.setConfigPortalTimeout(180); // in case the connection to the router is interrupted, unless this is set to non-zero it will not attempt to reconnect
 
         if (!wm.autoConnect(AP_NAME)) {
             wm.reboot();
         } else {
             connection_success = true;
-            wm.setConfigPortalBlocking(false);
+            wm.setConfigPortalTimeout(0); // this is no longer needed since the connection is done
+            wm.setConfigPortalBlocking(false); // disable blocking and then start the web server for the config portal
             wm.startConfigPortal(AP_NAME);
         }
     }

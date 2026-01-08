@@ -14,3 +14,10 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+  # backend:
+  #   build:
+  #     context: ./backend
+  #   env_file:
+  #     - ./backend/.env
+  #   restart: unless-stopped
+  #   network_mode: host
