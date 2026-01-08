@@ -4,9 +4,9 @@
 //#define MODE_COLLECT  
 #define MODE_DETECT 
 
-constexpr int DIGITAL_PIN = 32;
-constexpr int LED_PIN = 2;
-constexpr int WINDOW_MS = 10;
+constexpr int SENSOR_PIN = 32;
+constexpr int INDICATOR_LED_PIN = 2;
+constexpr int SAMPLING_WINDOW_MS = 10;
 
 #ifdef MODE_COLLECT
     #include "Collector.h"
@@ -20,8 +20,8 @@ constexpr int WINDOW_MS = 10;
 
 void setup() {
     Serial.begin(115200);
-    pinMode(DIGITAL_PIN, INPUT);
-    pinMode(LED_PIN, OUTPUT);
+    pinMode(SENSOR_PIN, INPUT);
+    pinMode(INDICATOR_LED_PIN, OUTPUT);
 
     #ifdef MODE_COLLECT
         Collector::setup();
@@ -31,23 +31,26 @@ void setup() {
         Config::setup();
         MqttHandler::setup();
         Detector::setup();
+
         Detector::onDetection = MqttHandler::handleDetection;
-        MqttHandler::onCallback = Detector::handleCallback;
-        Config::onConfigChange = MqttHandler::handleConfigChange;
+        MqttHandler::onCommandReceived = Detector::handleRemoteConfig;
+        Config::onConfigChange = MqttHandler::syncWithConfig;
     #endif
 }
 
 void loop() {
     #ifdef MODE_COLLECT
-        Collector::run(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+        Collector::loop(SENSOR_PIN, INDICATOR_LED_PIN, SAMPLING_WINDOW_MS);
     #endif
 
     #ifdef MODE_DETECT
         Config::loop();
-        if (Config::connection_success) {
+
+        if (Config::isWifiConnected) {
             MqttHandler::loop();
-            if (MqttHandler::connection_success) {
-                Detector::loop(DIGITAL_PIN, LED_PIN, WINDOW_MS);
+
+            if (MqttHandler::isMqttConnected) {
+                Detector::loop(SENSOR_PIN, INDICATOR_LED_PIN, SAMPLING_WINDOW_MS);
             }
         }
     #endif

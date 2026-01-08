@@ -5,22 +5,22 @@
 #include <Preferences.h>
 
 namespace Config {
-    #define TIMEOUT 15
-    #define AP_IP_ADDRESS 172,217,28,1
-    #define AP_IP_MASK 255,255,255,0
     #define KEY_CONFIG "config"
     #define AP_NAME "Pest Detector"
     #define AP_TITLE "Control Panel"
+    #define AP_IP_MASK 255,255,255,0
+    #define AP_IP_ADDRESS 172,217,28,1
+    #define TIMEOUT 15
 
     struct ConfigParam {
         const char* key;
         const char* label;
         int length;
         char value[64];
-        WiFiManagerParameter* param;
+        WiFiManagerParameter* paramInstance;
     };
 
-    ConfigParam params[] = {
+    ConfigParam portalParams[] = {
         {"mqtt_server", "MQTT Server", 40, "", nullptr},
         {"mqtt_port", "MQTT Port", 6, "", nullptr},
         {"mqtt_username", "MQTT Username", 40, "", nullptr},
@@ -28,82 +28,86 @@ namespace Config {
         {"user_token", "User Token", 64, "", nullptr}
     };
 
-    const int paramCount = sizeof(params) / sizeof(params[0]);
-    Preferences preferences;
-    WiFiManager wm;
-    bool connection_success = false;
+    const int portalParamCount = sizeof(portalParams) / sizeof(portalParams[0]);
+
+    Preferences persistentStore;
+    WiFiManager portalManager;
+    bool isWifiConnected = false;
+
     void (*onConfigChange)() = nullptr;
 
+    void saveParamsCallback() {
+        persistentStore.begin(KEY_CONFIG, false);
+        for (int i = 0; i < portalParamCount; i++) {
+            strcpy(portalParams[i].value, portalParams[i].paramInstance->getValue());
+            persistentStore.putString(portalParams[i].key, portalParams[i].value);
+        }
+        persistentStore.end();
+
+        Serial.println("[Config] Settings Saved.");
+        if (onConfigChange != nullptr) {
+            onConfigChange();
+        }
+    }
+
     // Helper to get value by key later in Detector.h
-    const char* get(const char* key) {
-        for (int i = 0; i < paramCount; i++) {
-            if (strcmp(params[i].key, key) == 0) {
-                return params[i].value;
+    const char* getParamValue(const char* key) {
+        for (int i = 0; i < portalParamCount; i++) {
+            if (strcmp(portalParams[i].key, key) == 0) {
+                return portalParams[i].value;
             }
         }
         return "";
     }
 
-    void saveParamsCallback() {
-        preferences.begin(KEY_CONFIG, false);
-        for (int i = 0; i < paramCount; i++) {
-            strcpy(params[i].value, params[i].param->getValue());
-            preferences.putString(params[i].key, params[i].value);
-        }
-        preferences.end();
-        if (onConfigChange != nullptr) {
-            onConfigChange();
-        }
-        Serial.println("[Config] Settings Saved.");
-    }
-
     void setup() {
         WiFi.mode(WIFI_STA);
-        
-        // Load preferences
-        preferences.begin(KEY_CONFIG, true);
-        for (int i = 0; i < paramCount; i++) {
-            String storedVal = preferences.getString(params[i].key, "");
-            strcpy(params[i].value, storedVal.c_str());
 
-            params[i].param = new WiFiManagerParameter(params[i].key, params[i].label, params[i].value, params[i].length);
-            wm.addParameter(params[i].param);
+        // Load preferences
+        persistentStore.begin(KEY_CONFIG, true);
+        for (int i = 0; i < portalParamCount; i++) {
+            String storedVal = persistentStore.getString(portalParams[i].key, "");
+            strcpy(portalParams[i].value, storedVal.c_str());
+
+            portalParams[i].paramInstance = new WiFiManagerParameter(
+                portalParams[i].key, portalParams[i].label, portalParams[i].value, portalParams[i].length
+            );
+            portalManager.addParameter(portalParams[i].paramInstance);
         }
-        preferences.end();
+        persistentStore.end();
 
         // Menu config
-        const char* menu[] = {"wifi", "info", "param", "sep", "erase", "restart"};
-        wm.setMenu(menu, 6);
-        wm.setShowInfoUpdate(false);
-        wm.setShowInfoErase(false);
-        wm.setTitle(AP_TITLE);
+        const char* menuLayout[] = {"wifi", "info", "param", "sep", "restart"};
+        portalManager.setMenu(menuLayout, 5);
+        portalManager.setShowInfoUpdate(false);
+        portalManager.setTitle(AP_TITLE);
 
         // WiFiManager config
-        wm.setConfigPortalBlocking(true); // block everything until after the connection is completed
-        wm.setSaveParamsCallback(saveParamsCallback);
-        wm.setConnectTimeout(TIMEOUT);
-        wm.setAPStaticIPConfig(IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_MASK));
-        wm.setConfigPortalTimeout(180); // in case the connection to the router is interrupted, unless this is set to non-zero it will not attempt to reconnect
+        portalManager.setConfigPortalBlocking(true); // block everything until after the connection is completed
+        portalManager.setSaveParamsCallback(saveParamsCallback);
+        portalManager.setConnectTimeout(TIMEOUT);
+        portalManager.setAPStaticIPConfig(IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_MASK));
+        portalManager.setConfigPortalTimeout(180); // in case the connection to the router is interrupted, unless this is set to non-zero it will not attempt to reconnect
 
-        if (!wm.autoConnect(AP_NAME)) {
-            wm.reboot();
+        if (!portalManager.autoConnect(AP_NAME)) {
+            portalManager.reboot();
         } else {
-            connection_success = true;
-            wm.setConfigPortalTimeout(0); // this is no longer needed since the connection is done
-            wm.setConfigPortalBlocking(false); // disable blocking and then start the web server for the config portal
-            wm.startConfigPortal(AP_NAME);
+            isWifiConnected = true;
+            portalManager.setConfigPortalTimeout(0); // this is no longer needed since the connection is done
+            portalManager.setConfigPortalBlocking(false); // disable blocking and then start the web server for the config portal
+            portalManager.startConfigPortal(AP_NAME);
         }
     }
 
     void loop() {
-        if (!connection_success) {
+        if (!isWifiConnected) {
             return;
         }
 
-        wm.process();
+        portalManager.process();
 
         if (!WiFi.isConnected()) {
-            wm.reboot();
+            portalManager.reboot();
         }
     }
 }

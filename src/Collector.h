@@ -12,7 +12,7 @@ namespace Collector {
         Serial.println("timestamp_ms,intensity");
     }
 
-    void run(int digitalPin, int ledPin, int windowMs) {
+    void loop(int digitalPin, int ledPin, int windowMs) {
         if (digitalRead(digitalPin) == HIGH) {
             high_count++;
         }

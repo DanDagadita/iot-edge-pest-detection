@@ -7,63 +7,66 @@
 #include "Config.h"
 
 namespace MqttHandler {
-    unsigned long lastReconnectAttempt = 0;
-    WiFiClient espClient;
-    PubSubClient client(espClient);
-    String macAddr;
-    bool connection_success = false;
-    void (*onCallback)(JsonDocument doc) = nullptr;
+    WiFiClient networkClient;
+    PubSubClient mqttMessenger(networkClient);
 
-    void callback(char* topic, byte* payload, unsigned int length) {
+    String deviceMac;
+    bool isMqttConnected = false;
+    unsigned long lastReconnectTimestamp = 0;
+    
+    void (*onCommandReceived)(JsonDocument doc) = nullptr;
+
+    void onMessageReceived(char* topic, byte* payload, unsigned int length) {
         JsonDocument doc;
         deserializeJson(doc, payload, length);
 
-        if (onCallback != nullptr) {
-            onCallback(doc);
+        if (onCommandReceived != nullptr) {
+            onCommandReceived(doc);
         }
     }
 
-    void setup() {
-        macAddr = WiFi.macAddress();
-        client.setCallback(callback);
-        espClient.setTimeout(2);
-    }
-
-    void sendPairing() {
+    void sendDeviceHandshake() {
         JsonDocument doc;
-        doc["mac"] = macAddr;
-        doc["token"] = Config::get("user_token");
+        doc["mac"] = deviceMac;
+        doc["token"] = Config::getParamValue("user_token");
 
         char buffer[256];
         serializeJson(doc, buffer);
-        client.publish("pest/pair", buffer);
+        mqttMessenger.publish("pest/pair", buffer);
         Serial.println("[MQTT] Sent Pairing Message");
 
-        String cmdTopic = "pest/cmd/" + macAddr;
-        client.subscribe(cmdTopic.c_str());
+        String cmdTopic = "pest/cmd/" + deviceMac;
+        mqttMessenger.subscribe(cmdTopic.c_str());
     }
 
-    void reconnect(bool skipTimer = false) {
-        if (!skipTimer && millis() - lastReconnectAttempt < 10000) {
+    void setup() {
+        deviceMac = WiFi.macAddress();
+        mqttMessenger.setCallback(onMessageReceived);
+        networkClient.setTimeout(2);
+    }
+
+    void attemptReconnect(bool skipTimer = false) {
+        if (!skipTimer && millis() - lastReconnectTimestamp < 10000) {
             return;
         }
-        lastReconnectAttempt = millis();
+        lastReconnectTimestamp = millis();
 
-        client.setServer(Config::get("mqtt_server"), atoi(Config::get("mqtt_port")));
+        mqttMessenger.setServer(Config::getParamValue("mqtt_server"), atoi(Config::getParamValue("mqtt_port")));
         Serial.print("[MQTT] Connecting...");
-        if (client.connect(macAddr.c_str(), Config::get("mqtt_username"), Config::get("mqtt_password"))) {
-            connection_success = true;
+
+        if (mqttMessenger.connect(deviceMac.c_str(), Config::getParamValue("mqtt_username"), Config::getParamValue("mqtt_password"))) {
+            isMqttConnected = true;
             Serial.println("connected");
-            sendPairing();
+            sendDeviceHandshake();
         } else {
-            connection_success = false;
-            Serial.print("failed, rc=");
-            Serial.print(client.state());
+            isMqttConnected = false;
+            Serial.printf("failed, rc=%d\n", mqttMessenger.state());
         }
     }
 
+
     void handleDetection(float prob, float intensity) {
-        if (!client.connected()) {
+        if (!mqttMessenger.connected()) {
             return;
         }
 
@@ -73,23 +76,23 @@ namespace MqttHandler {
         
         char buffer[256];
         serializeJson(doc, buffer);
-        String topic = "pest/telemetry/" + macAddr;
-        client.publish(topic.c_str(), buffer);
+        String topic = "pest/telemetry/" + deviceMac;
+        mqttMessenger.publish(topic.c_str(), buffer);
     }
 
-    void handleConfigChange() {
-        if (client.connected()) {
-            client.disconnect();
+    void syncWithConfig() {
+        if (mqttMessenger.connected()) {
+            mqttMessenger.disconnect();
         }
-        reconnect(true);
+        attemptReconnect(true);
     }
-
+    
     void loop() {
-        if (!client.connected()) {
-            reconnect();
+        if (!mqttMessenger.connected()) {
+            attemptReconnect();
             return;
         }
-        client.loop();
+        mqttMessenger.loop();
     }
 }
 
