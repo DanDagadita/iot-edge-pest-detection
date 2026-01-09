@@ -1,10 +1,10 @@
 #ifndef DETECTOR_H
 #define DETECTOR_H
 
-#include <Arduino.h>
 #include <EloquentTinyML.h>
 #include <ArduinoJson.h>
-#include "pest_model.h"
+#include "PestModel.h"
+#include "Hardware.h"
 
 namespace Detector {
     #define NUMBER_OF_INPUTS 100
@@ -20,7 +20,7 @@ namespace Detector {
     int activeSignalTicks = 0;
     int totalSignalTicks = 0;
     int inferenceSkipCounter = 0;
-    
+
     void (*onDetection)(float, float) = nullptr;
 
     void setup() {
@@ -28,29 +28,29 @@ namespace Detector {
             featureBuffer[i] = 0.0f;
         }
 
-        if (!pestClassifier.begin(pest_model_tflite)) {
-            Serial.println("Error, could not initialize model");
+        if (!pestClassifier.begin(pestModelTflite)) {
+            Hardware::log("[Detector] Error, could not initialize model");
             while (1);
         }
-        Serial.println("Pest detector ready!");
+        Hardware::log("[Detector] Pest detector ready!");
     }
 
-    void handleRemoteConfig(JsonDocument doc) {
+    void handleCommandReceived(JsonDocument doc) {
         if (doc["threshold"].is<float>()) {
             detectionThreshold = doc["threshold"];
-            Serial.printf("[Config] Updated threshold to: %.2f\n", detectionThreshold);
+            Hardware::log("[Detector] Updated threshold to: %.2f", detectionThreshold);
         }
     }
 
-    void loop(int digitalPin, int ledPin, int windowMs) {
-        if (digitalRead(digitalPin) == HIGH) {
+    void loop() {
+        if (Hardware::getMicrophoneState()) {
             activeSignalTicks++;
         }
 
         totalSignalTicks++;
 
         unsigned long now = millis();
-        if (now - lastWindowTimestamp >= windowMs) {
+        if (now - lastWindowTimestamp >= Hardware::SAMPLING_WINDOW_MS) {
             float intensity = (float)activeSignalTicks / totalSignalTicks;
 
             for (int i = 0; i < NUMBER_OF_INPUTS - 1; i++) {
@@ -61,19 +61,16 @@ namespace Detector {
             if (inferenceSkipCounter++ >= 10) {
                 float prediction = pestClassifier.predict(featureBuffer);
 
-                Serial.print("Intensity: ");
-                Serial.print(intensity * 100);
-                Serial.print("% Pest probability: ");
-                Serial.println(prediction, 4);
+                Hardware::log("[Detector] Intensity: %.2f%% Pest probability: %.4f", intensity * 100, prediction);
 
                 if (prediction > detectionThreshold) {
-                    Serial.println("##### PEST DETECTED! ####");
-                    digitalWrite(ledPin, HIGH);
+                    Hardware::log("[Detector] PEST DETECTED!");
+                    Hardware::setIndicator(HIGH, true);
                     if (onDetection != nullptr) {
                         onDetection(prediction, intensity);
                     }
                 } else {
-                    analogWrite(ledPin, (int)(intensity * 255.0));
+                    Hardware::setIndicator((int)(intensity * 255.0), false);
                 }
                 inferenceSkipCounter = 0;
             }

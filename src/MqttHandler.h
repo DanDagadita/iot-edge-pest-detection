@@ -13,12 +13,13 @@ namespace MqttHandler {
     String deviceMac;
     bool isMqttConnected = false;
     unsigned long lastReconnectTimestamp = 0;
-    
+
     void (*onCommandReceived)(JsonDocument doc) = nullptr;
 
     void onMessageReceived(char* topic, byte* payload, unsigned int length) {
         JsonDocument doc;
         deserializeJson(doc, payload, length);
+        Hardware::log("[MQTT] Received message");
 
         if (onCommandReceived != nullptr) {
             onCommandReceived(doc);
@@ -32,10 +33,11 @@ namespace MqttHandler {
 
         char buffer[256];
         serializeJson(doc, buffer);
-        mqttMessenger.publish("pest/pair", buffer);
-        Serial.println("[MQTT] Sent Pairing Message");
+        mqttMessenger.publish("device/pair", buffer);
 
-        String cmdTopic = "pest/cmd/" + deviceMac;
+        Hardware::log("[MQTT] Sent pairing message");
+
+        String cmdTopic = "device/cmd/" + deviceMac;
         mqttMessenger.subscribe(cmdTopic.c_str());
     }
 
@@ -52,18 +54,17 @@ namespace MqttHandler {
         lastReconnectTimestamp = millis();
 
         mqttMessenger.setServer(Config::getParamValue("mqtt_server"), atoi(Config::getParamValue("mqtt_port")));
-        Serial.print("[MQTT] Connecting...");
+        Hardware::log("[MQTT] Connecting...");
 
         if (mqttMessenger.connect(deviceMac.c_str(), Config::getParamValue("mqtt_username"), Config::getParamValue("mqtt_password"))) {
             isMqttConnected = true;
-            Serial.println("connected");
+            Hardware::log("[MQTT] connected");
             sendDeviceHandshake();
         } else {
             isMqttConnected = false;
-            Serial.printf("failed, rc=%d\n", mqttMessenger.state());
+            Hardware::log("[MQTT] failed, rc=%d", mqttMessenger.state());
         }
     }
-
 
     void handleDetection(float prob, float intensity) {
         if (!mqttMessenger.connected()) {
@@ -73,20 +74,20 @@ namespace MqttHandler {
         JsonDocument doc;
         doc["prob"] = prob;
         doc["intensity"] = intensity;
-        
+
         char buffer[256];
         serializeJson(doc, buffer);
-        String topic = "pest/telemetry/" + deviceMac;
+        String topic = "device/telemetry/" + deviceMac;
         mqttMessenger.publish(topic.c_str(), buffer);
     }
 
-    void syncWithConfig() {
+    void handleConfigChange() {
         if (mqttMessenger.connected()) {
             mqttMessenger.disconnect();
         }
         attemptReconnect(true);
     }
-    
+
     void loop() {
         if (!mqttMessenger.connected()) {
             attemptReconnect();

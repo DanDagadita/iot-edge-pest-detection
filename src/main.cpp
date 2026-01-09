@@ -1,12 +1,8 @@
-#include <Arduino.h>
+#include "Hardware.h"
 
 // Switch mode here:
 //#define MODE_COLLECT  
 #define MODE_DETECT 
-
-constexpr int SENSOR_PIN = 32;
-constexpr int INDICATOR_LED_PIN = 2;
-constexpr int SAMPLING_WINDOW_MS = 10;
 
 #ifdef MODE_COLLECT
     #include "Collector.h"
@@ -19,9 +15,7 @@ constexpr int SAMPLING_WINDOW_MS = 10;
 #endif
 
 void setup() {
-    Serial.begin(115200);
-    pinMode(SENSOR_PIN, INPUT);
-    pinMode(INDICATOR_LED_PIN, OUTPUT);
+    Hardware::setup();
 
     #ifdef MODE_COLLECT
         Collector::setup();
@@ -33,14 +27,14 @@ void setup() {
         Detector::setup();
 
         Detector::onDetection = MqttHandler::handleDetection;
-        MqttHandler::onCommandReceived = Detector::handleRemoteConfig;
-        Config::onConfigChange = MqttHandler::syncWithConfig;
+        MqttHandler::onCommandReceived = Detector::handleCommandReceived;
+        Config::onConfigChange = MqttHandler::handleConfigChange;
     #endif
 }
 
 void loop() {
     #ifdef MODE_COLLECT
-        Collector::loop(SENSOR_PIN, INDICATOR_LED_PIN, SAMPLING_WINDOW_MS);
+        Collector::loop();
     #endif
 
     #ifdef MODE_DETECT
@@ -50,7 +44,7 @@ void loop() {
             MqttHandler::loop();
 
             if (MqttHandler::isMqttConnected) {
-                Detector::loop(SENSOR_PIN, INDICATOR_LED_PIN, SAMPLING_WINDOW_MS);
+                Detector::loop();
             }
         }
     #endif

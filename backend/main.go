@@ -50,7 +50,7 @@ func main() {
 
 		server.Log.Info("Inbound Message", "topic", topic, "payload", string(payload))
 
-		if topic == "pest/pair" {
+		if topic == "device/pair" {
 			var data Device
 			if err := json.Unmarshal(payload, &data); err == nil {
 				data.Threshold = 0.9 // Set default threshold
@@ -58,15 +58,15 @@ func main() {
 				fmt.Printf("PAIRED: Device [%s] with Token [%s]\n", data.MAC, data.UserToken)
 
 				// send initial config back to device
-				configTopic := fmt.Sprintf("pest/cmd/%s", data.MAC)
+				configTopic := fmt.Sprintf("device/cmd/%s", data.MAC)
 				configPayload := `{"threshold": 0.9, "window": 10}`
 				server.Publish(configTopic, []byte(configPayload), false, 0)
 			}
 		}
 
-		// handling telemetry (pest/telemetry/*)
-		// example: pest/telemetry/AA:BB:CC:DD:EE:FF
-		if len(topic) > 15 && topic[:15] == "pest/telemetry/" {
+		// handling telemetry (device/telemetry/*)
+		// example: device/telemetry/AA:BB:CC:DD:EE:FF
+		if len(topic) > 15 && topic[:15] == "device/telemetry/" {
 			var telemetry struct {
 				Prob      float32 `json:"prob"`
 				Intensity float32 `json:"intensity"`
@@ -78,7 +78,7 @@ func main() {
 		}
 	}
 
-	err = server.Subscribe("pest/#", 1, callbackFn)
+	err = server.Subscribe("device/#", 1, callbackFn)
 	if err != nil {
 		log.Fatal(err)
 	}
