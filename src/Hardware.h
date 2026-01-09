@@ -15,7 +15,7 @@ namespace Hardware {
     }
 
     template<typename... Args>
-    void log(const char* format, Args... args) {
+    void log(const char* format, const Args... args) {
         char buffer[256];
         snprintf(buffer, sizeof(buffer), format, args...);
         Serial.println(buffer);
@@ -25,7 +25,7 @@ namespace Hardware {
         return digitalRead(PIN_SENSOR) == HIGH;
     }
 
-    void setIndicator(int value, bool isDigital) {
+    void setIndicator(const int value, const bool isDigital) {
         if (isDigital) {
             digitalWrite(PIN_LED, HIGH);
         } else {

@@ -7,9 +7,9 @@
 #include "Hardware.h"
 
 namespace Detector {
-    #define NUMBER_OF_INPUTS 100
-    #define NUMBER_OF_OUTPUTS 1
-    #define TENSOR_ARENA_SIZE 8 * 1024
+    constexpr int NUMBER_OF_INPUTS = 100;
+    constexpr int NUMBER_OF_OUTPUTS = 1;
+    constexpr int TENSOR_ARENA_SIZE = 8 * 1024;
 
     Eloquent::TinyML::TfLite<NUMBER_OF_INPUTS, NUMBER_OF_OUTPUTS, TENSOR_ARENA_SIZE> pestClassifier;
 
@@ -23,6 +23,13 @@ namespace Detector {
 
     void (*onDetection)(float, float) = nullptr;
 
+    void handleCommandReceived(JsonDocument doc) {
+        if (doc["threshold"].is<float>()) {
+            detectionThreshold = doc["threshold"];
+            Hardware::log("[Detector] Updated threshold to: %.2f", detectionThreshold);
+        }
+    }
+
     void setup() {
         for (int i = 0; i < NUMBER_OF_INPUTS; i++) {
             featureBuffer[i] = 0.0f;
@@ -33,13 +40,6 @@ namespace Detector {
             while (1);
         }
         Hardware::log("[Detector] Pest detector ready!");
-    }
-
-    void handleCommandReceived(JsonDocument doc) {
-        if (doc["threshold"].is<float>()) {
-            detectionThreshold = doc["threshold"];
-            Hardware::log("[Detector] Updated threshold to: %.2f", detectionThreshold);
-        }
     }
 
     void loop() {

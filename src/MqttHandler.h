@@ -7,16 +7,22 @@
 #include "Config.h"
 
 namespace MqttHandler {
+    constexpr int CLIENT_TIMEOUT_SECONDS = 2;
+    constexpr int RECONNECT_TIMEOUT_MILISECONDS = 10 * 1000;
+    constexpr int JSON_BUFFER_SIZE = 256;
+    constexpr int TOPIC_BUFFER_SIZE = 64;
+    constexpr int MAC_BUFFER_SIZE = 18;
+
     WiFiClient networkClient;
     PubSubClient mqttMessenger(networkClient);
 
-    String deviceMac;
+    char deviceMac[MAC_BUFFER_SIZE];
     bool isMqttConnected = false;
     unsigned long lastReconnectTimestamp = 0;
 
     void (*onCommandReceived)(JsonDocument doc) = nullptr;
 
-    void onMessageReceived(char* topic, byte* payload, unsigned int length) {
+    void onMessageReceived(const char* topic, const byte* payload, const unsigned int length) {
         JsonDocument doc;
         deserializeJson(doc, payload, length);
         Hardware::log("[MQTT] Received message");
@@ -26,47 +32,30 @@ namespace MqttHandler {
         }
     }
 
+    void subscribeToTopic(const char* topic) {
+        mqttMessenger.subscribe(topic);
+        Hardware::log("[MQTT] Subscribed to topic %s", topic);
+    }
+
+    void publishToTopic(const char* topic, const JsonDocument& doc) {
+        char buffer[JSON_BUFFER_SIZE];
+        serializeJson(doc, buffer);
+        mqttMessenger.publish(topic, buffer);
+        Hardware::log("[MQTT] Published to topic %s", topic);
+    }
+
     void sendDeviceHandshake() {
+        char topic[TOPIC_BUFFER_SIZE];
+        snprintf(topic, sizeof(topic), "device/cmd/%s", deviceMac);
+        subscribeToTopic(topic);
+
         JsonDocument doc;
         doc["mac"] = deviceMac;
-        doc["token"] = Config::getParamValue("user_token");
-
-        char buffer[256];
-        serializeJson(doc, buffer);
-        mqttMessenger.publish("device/pair", buffer);
-
-        Hardware::log("[MQTT] Sent pairing message");
-
-        String cmdTopic = "device/cmd/" + deviceMac;
-        mqttMessenger.subscribe(cmdTopic.c_str());
+        doc["token"] = Config::settings.userToken;
+        publishToTopic("device/pair", doc);
     }
 
-    void setup() {
-        deviceMac = WiFi.macAddress();
-        mqttMessenger.setCallback(onMessageReceived);
-        networkClient.setTimeout(2);
-    }
-
-    void attemptReconnect(bool skipTimer = false) {
-        if (!skipTimer && millis() - lastReconnectTimestamp < 10000) {
-            return;
-        }
-        lastReconnectTimestamp = millis();
-
-        mqttMessenger.setServer(Config::getParamValue("mqtt_server"), atoi(Config::getParamValue("mqtt_port")));
-        Hardware::log("[MQTT] Connecting...");
-
-        if (mqttMessenger.connect(deviceMac.c_str(), Config::getParamValue("mqtt_username"), Config::getParamValue("mqtt_password"))) {
-            isMqttConnected = true;
-            Hardware::log("[MQTT] connected");
-            sendDeviceHandshake();
-        } else {
-            isMqttConnected = false;
-            Hardware::log("[MQTT] failed, rc=%d", mqttMessenger.state());
-        }
-    }
-
-    void handleDetection(float prob, float intensity) {
+    void handleDetection(const float prob, const float intensity) {
         if (!mqttMessenger.connected()) {
             return;
         }
@@ -74,11 +63,28 @@ namespace MqttHandler {
         JsonDocument doc;
         doc["prob"] = prob;
         doc["intensity"] = intensity;
+        char topic[TOPIC_BUFFER_SIZE];
+        snprintf(topic, sizeof(topic), "device/telemetry/%s", deviceMac);
+        publishToTopic(topic, doc);
+    }
 
-        char buffer[256];
-        serializeJson(doc, buffer);
-        String topic = "device/telemetry/" + deviceMac;
-        mqttMessenger.publish(topic.c_str(), buffer);
+    void attemptReconnect(const bool skipTimer = false) {
+        if (!skipTimer && lastReconnectTimestamp != 0 && millis() - lastReconnectTimestamp < RECONNECT_TIMEOUT_MILISECONDS) {
+            return;
+        }
+        lastReconnectTimestamp = millis();
+
+        mqttMessenger.setServer(Config::settings.mqttServer, atoi(Config::settings.mqttPort));
+        Hardware::log("[MQTT] Connecting...");
+
+        if (mqttMessenger.connect(deviceMac, Config::settings.mqttUsername, Config::settings.mqttPassword)) {
+            isMqttConnected = true;
+            Hardware::log("[MQTT] Connected");
+            sendDeviceHandshake();
+        } else {
+            isMqttConnected = false;
+            Hardware::log("[MQTT] Connection failed, client state: %d", mqttMessenger.state());
+        }
     }
 
     void handleConfigChange() {
@@ -86,6 +92,12 @@ namespace MqttHandler {
             mqttMessenger.disconnect();
         }
         attemptReconnect(true);
+    }
+
+    void setup() {
+        strncpy(deviceMac, WiFi.macAddress().c_str(), sizeof(deviceMac));
+        mqttMessenger.setCallback(onMessageReceived);
+        networkClient.setTimeout(CLIENT_TIMEOUT_SECONDS);
     }
 
     void loop() {

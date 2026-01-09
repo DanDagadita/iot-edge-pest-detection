@@ -5,27 +5,35 @@
 #include <Preferences.h>
 
 namespace Config {
-    #define KEY_CONFIG "config"
-    #define AP_NAME "Pest Detector"
-    #define AP_TITLE "Control Panel"
-    #define AP_IP_MASK 255,255,255,0
-    #define AP_IP_ADDRESS 172,217,28,1
-    #define TIMEOUT 15
+    constexpr const char* KEY_CONFIG = "config";
+    constexpr const char* AP_NAME = "Pest Detector";
+    constexpr const char* AP_TITLE = "Control Panel";
+    constexpr int TIMEOUT = 15;
+    const IPAddress AP_IP_ADDRESS(172,217,28,1);
+    const IPAddress AP_IP_MASK(255,255,255,0);
+
+    struct Settings {
+        char mqttServer[40];
+        char mqttPort[6];
+        char mqttUsername[40];
+        char mqttPassword[40];
+        char userToken[64];
+    } settings;
 
     struct ConfigParam {
         const char* key;
         const char* label;
         int length;
-        char value[64];
+        char* value;
         WiFiManagerParameter* paramInstance;
     };
 
     ConfigParam portalParams[] = {
-        {"mqtt_server", "MQTT Server", 40, "", nullptr},
-        {"mqtt_port", "MQTT Port", 6, "", nullptr},
-        {"mqtt_username", "MQTT Username", 40, "", nullptr},
-        {"mqtt_password", "MQTT Password", 40, "", nullptr},
-        {"user_token", "User Token", 64, "", nullptr}
+        {"mqtt_server", "MQTT Server", 40, settings.mqttServer},
+        {"mqtt_port", "MQTT Port", 6, settings.mqttPort},
+        {"mqtt_username", "MQTT Username", 40, settings.mqttUsername},
+        {"mqtt_password", "MQTT Password", 40, settings.mqttPassword},
+        {"user_token", "User Token", 64, settings.userToken}
     };
 
     const int portalParamCount = sizeof(portalParams) / sizeof(portalParams[0]);
@@ -48,15 +56,6 @@ namespace Config {
         if (onConfigChange != nullptr) {
             onConfigChange();
         }
-    }
-
-    const char* getParamValue(const char* key) {
-        for (int i = 0; i < portalParamCount; i++) {
-            if (strcmp(portalParams[i].key, key) == 0) {
-                return portalParams[i].value;
-            }
-        }
-        return "";
     }
 
     void setup() {
@@ -85,7 +84,7 @@ namespace Config {
         wifiManager.setConfigPortalBlocking(true); // block everything until after the connection is completed
         wifiManager.setSaveParamsCallback(saveParamsCallback);
         wifiManager.setConnectTimeout(TIMEOUT);
-        wifiManager.setAPStaticIPConfig(IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_ADDRESS), IPAddress(AP_IP_MASK));
+        wifiManager.setAPStaticIPConfig(AP_IP_ADDRESS, AP_IP_ADDRESS, AP_IP_MASK);
         wifiManager.setConfigPortalTimeout(180); // in case the connection to the router is interrupted, unless this is set to non-zero it will not attempt to reconnect
 
         if (!wifiManager.autoConnect(AP_NAME)) {
