@@ -6,11 +6,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /usr/local/bin/app .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /usr/local/bin/app ./cmd/app/
 
 FROM alpine:latest
-
-RUN apk add --no-cache
 
 RUN addgroup -g 1000 appuser \
     && adduser -u 1000 -G appuser -D appuser
