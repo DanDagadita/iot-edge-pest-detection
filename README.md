@@ -16,8 +16,15 @@ This project requires a machine with an Nvidia GPU and its drivers, Docker Compo
 
 ## Starting training
 
-**1.** In a terminal, clone this repository: `git clone https://github.com/DanDagadita/financial-sentiment-analysis.git`
+**1.** In a terminal, clone this repository: `git clone https://github.com/DanDagadita/iot-pest-detection.git`
 
 **2.** Enter the cloned repository's folder, then run `docker compose up -d`, which starts the container containing the Google Colab Jupyter environment.
 
 **3.** Upon opening this project in your text editor/IDE of choice, and opening the `notebook.ipynb` file, you have the choice to connect to the local runtime using `http://127.0.0.1:9000`. I used VSCode, using the suggested Jupyter and Python extensions.
+
+## Benchmarks
+
+* 0.5ms -> optimized serial logging
+* 0.8ms -> custom serial logging
+* 5ms -> publish to MQTT
+* 62ms -> print to LCD

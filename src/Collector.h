@@ -4,31 +4,31 @@
 #include "Hardware.h"
 
 namespace Collector {
-    unsigned long lastWindowTime = 0;
-    int highCount = 0;
-    int totalCount = 0;
-
     void setup() {
         Hardware::log("timestamp_ms,intensity");
     }
 
     void loop() {
+        static int activeSignalTicks = 0;
+        static int totalSignalTicks = 0;
+
         if (Hardware::getMicrophoneState()) {
-            highCount++;
+            activeSignalTicks++;
         }
 
-        totalCount++;
+        totalSignalTicks++;
 
         unsigned long now = millis();
-        if (now - lastWindowTime >= Hardware::SAMPLING_WINDOW_MS) {
-            float intensity = (float)highCount / totalCount * 100.0;
+        static unsigned long lastLoop = 0;
+        if (lastLoop == 0 || now - lastLoop > Hardware::SAMPLING_WINDOW_MS) {
+            float intensity = (float)activeSignalTicks / totalSignalTicks * 100.0;
 
             Hardware::log("%lu,%.2f", now, intensity);
             Hardware::setIndicator((int)(intensity * 2.55), false);
 
-            highCount = 0;
-            totalCount = 0;
-            lastWindowTime = now;
+            activeSignalTicks = 0;
+            totalSignalTicks = 0;
+            lastLoop = millis();
         }
     }
 }

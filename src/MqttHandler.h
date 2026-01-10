@@ -7,28 +7,27 @@
 #include "Config.h"
 
 namespace MqttHandler {
-    constexpr int CLIENT_TIMEOUT_SECONDS = 2;
-    constexpr int RECONNECT_TIMEOUT_MILISECONDS = 10 * 1000;
+    constexpr int LOOP_LIMIT_MS = 70;
+    constexpr int CLIENT_TIMEOUT_S = 2;
     constexpr int JSON_BUFFER_SIZE = 256;
     constexpr int TOPIC_BUFFER_SIZE = 64;
     constexpr int MAC_BUFFER_SIZE = 18;
 
+    char deviceMac[MAC_BUFFER_SIZE];
+    bool isMqttConnected = false;
+
     WiFiClient networkClient;
     PubSubClient mqttMessenger(networkClient);
 
-    char deviceMac[MAC_BUFFER_SIZE];
-    bool isMqttConnected = false;
-    unsigned long lastReconnectTimestamp = 0;
-
-    void (*onCommandReceived)(JsonDocument doc) = nullptr;
+    void (*onConfigReceived)(JsonDocument doc) = nullptr;
 
     void onMessageReceived(const char* topic, const byte* payload, const unsigned int length) {
         JsonDocument doc;
         deserializeJson(doc, payload, length);
         Hardware::log("[MQTT] Received message");
 
-        if (onCommandReceived != nullptr) {
-            onCommandReceived(doc);
+        if (onConfigReceived != nullptr) {
+            onConfigReceived(doc);
         }
     }
 
@@ -44,46 +43,48 @@ namespace MqttHandler {
         Hardware::log("[MQTT] Published to topic %s", topic);
     }
 
-    void sendDeviceHandshake() {
+    void subscribeToDeviceTopic() {
         char topic[TOPIC_BUFFER_SIZE];
-        snprintf(topic, sizeof(topic), "device/cmd/%s", deviceMac);
+        snprintf(topic, sizeof(topic), "device/config/%s", deviceMac);
         subscribeToTopic(topic);
+    }
 
+    void publishConfig() {
         JsonDocument doc;
         doc["mac"] = deviceMac;
         doc["token"] = Config::settings.userToken;
         publishToTopic("device/pair", doc);
     }
 
-    void handleDetection(const float prob, const float intensity) {
-        if (!mqttMessenger.connected()) {
+    void handleDetection(const float probability, const float intensity) {
+        if (!isMqttConnected) {
             return;
         }
 
         JsonDocument doc;
-        doc["prob"] = prob;
+        doc["probability"] = probability;
         doc["intensity"] = intensity;
         char topic[TOPIC_BUFFER_SIZE];
         snprintf(topic, sizeof(topic), "device/telemetry/%s", deviceMac);
         publishToTopic(topic, doc);
     }
 
-    void attemptReconnect(const bool skipTimer = false) {
-        if (!skipTimer && lastReconnectTimestamp != 0 && millis() - lastReconnectTimestamp < RECONNECT_TIMEOUT_MILISECONDS) {
-            return;
-        }
-        lastReconnectTimestamp = millis();
-
+    void attemptReconnect() {
         mqttMessenger.setServer(Config::settings.mqttServer, atoi(Config::settings.mqttPort));
-        Hardware::log("[MQTT] Connecting...");
+        Hardware::log("[MQTT] Connecting");
+        Hardware::printToLCD("MQTT Connecting");
 
         if (mqttMessenger.connect(deviceMac, Config::settings.mqttUsername, Config::settings.mqttPassword)) {
             isMqttConnected = true;
-            Hardware::log("[MQTT] Connected");
-            sendDeviceHandshake();
+            Hardware::log("[MQTT] Connected!");
+            Hardware::printToLCD("MQTT Connected!");
+            subscribeToDeviceTopic();
+            publishConfig();
         } else {
             isMqttConnected = false;
             Hardware::log("[MQTT] Connection failed, client state: %d", mqttMessenger.state());
+            Hardware::printToLCD("MQTT Connection failed state %d", mqttMessenger.state());
+            delay(CLIENT_TIMEOUT_S * 1000);
         }
     }
 
@@ -91,21 +92,25 @@ namespace MqttHandler {
         if (mqttMessenger.connected()) {
             mqttMessenger.disconnect();
         }
-        attemptReconnect(true);
+        attemptReconnect();
     }
 
     void setup() {
         strncpy(deviceMac, WiFi.macAddress().c_str(), sizeof(deviceMac));
         mqttMessenger.setCallback(onMessageReceived);
-        networkClient.setTimeout(CLIENT_TIMEOUT_SECONDS);
+        mqttMessenger.setSocketTimeout(CLIENT_TIMEOUT_S);
+        networkClient.setTimeout(CLIENT_TIMEOUT_S);
     }
 
     void loop() {
-        if (!mqttMessenger.connected()) {
-            attemptReconnect();
-            return;
+        static unsigned long lastLoop = 0;
+        if (lastLoop == 0 || millis() - lastLoop > LOOP_LIMIT_MS) {
+            if (!mqttMessenger.connected()) {
+                attemptReconnect();
+            }
+            mqttMessenger.loop();
+            lastLoop = millis();
         }
-        mqttMessenger.loop();
     }
 }
 
