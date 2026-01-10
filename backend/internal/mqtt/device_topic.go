@@ -1,9 +1,10 @@
-package app
+package mqtt
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
@@ -34,7 +35,8 @@ type Telemetry struct {
 const defaultThreshold = 0.9
 const defaultWindow = 10
 
-var devices = make(map[string]Device)
+var DeviceMutex sync.RWMutex
+var Devices = make(map[string]Device)
 
 func handlePair(server *mqtt.Server, payload []byte) {
 	var data Pairing
@@ -44,12 +46,14 @@ func handlePair(server *mqtt.Server, payload []byte) {
 		return
 	}
 	config := Config{Threshold: defaultThreshold, Window: defaultWindow}
-	devices[data.MAC] = Device{
+	DeviceMutex.Lock()
+	Devices[data.MAC] = Device{
 		MAC:       data.MAC,
 		UserToken: data.UserToken,
 		Threshold: config.Threshold,
 		Window:    config.Window,
 	}
+	DeviceMutex.Unlock()
 	logInfo(server, "pairing success", payload, data.MAC)
 	publishConfig(server, data.MAC, config)
 }

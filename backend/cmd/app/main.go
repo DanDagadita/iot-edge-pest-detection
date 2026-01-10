@@ -1,9 +1,11 @@
 package main
 
 import (
-	"pest-detection/internal/app"
+	"pest-detection/internal/http"
+	"pest-detection/internal/mqtt"
 )
 
 func main() {
-	app.RunMQTTServer()
+	mqtt.Run()
+	http.Run()
 }
