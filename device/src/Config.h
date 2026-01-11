@@ -1,19 +1,12 @@
-#ifndef DEVICECONFIG_H
-#define DEVICECONFIG_H
+#ifndef CONFIG_H
+#define CONFIG_H
 
 #include <WiFiManager.h>
 #include <Preferences.h>
 #include "Hardware.h"
 
 namespace Config {
-    constexpr int LOOP_LIMIT_MS = 125;
-    constexpr int CONNECT_TIMEOUT_S = 15;
-    constexpr int WIFI_DISCONNECTED_DELAY_S = 1;
     constexpr const char* KEY_CONFIG = "config";
-    constexpr const char* AP_NAME = "Pest Detector";
-    constexpr const char* AP_TITLE = "Control Panel";
-    const IPAddress AP_IP_ADDRESS(172,217,28,1);
-    const IPAddress AP_IP_MASK(255,255,255,0);
 
     struct Settings {
         char mqttServer[40];
@@ -23,7 +16,7 @@ namespace Config {
         char userToken[64];
     } settings;
 
-    struct ConfigParam {
+    struct Param {
         const char* key;
         const char* label;
         int length;
@@ -31,7 +24,7 @@ namespace Config {
         WiFiManagerParameter* paramInstance;
     };
 
-    ConfigParam portalParams[] = {
+    Param params[] = {
         {"mqtt_server", "MQTT Server", 40, settings.mqttServer},
         {"mqtt_port", "MQTT Port", 6, settings.mqttPort},
         {"mqtt_username", "MQTT Username", 40, settings.mqttUsername},
@@ -39,89 +32,37 @@ namespace Config {
         {"user_token", "User Token", 64, settings.userToken}
     };
 
-    const int portalParamCount = sizeof(portalParams) / sizeof(portalParams[0]);
-    bool isWifiConnected = false;
+    const int portalParamCount = sizeof(params) / sizeof(params[0]);
 
     Preferences persistentStore;
-    WiFiManager wifiManager;
 
     void (*onConfigChange)() = nullptr;
+    void (*onAddParameter)(WiFiManagerParameter*) = nullptr;
 
-    void saveParamsCallback() {
+    void handleParamsSave() {
         persistentStore.begin(KEY_CONFIG, false);
         for (int i = 0; i < portalParamCount; i++) {
-            strcpy(portalParams[i].value, portalParams[i].paramInstance->getValue());
-            persistentStore.putString(portalParams[i].key, portalParams[i].value);
+            strcpy(params[i].value, params[i].paramInstance->getValue());
+            persistentStore.putString(params[i].key, params[i].value);
         }
         persistentStore.end();
 
         Hardware::log("[Config] Settings saved");
-        if (onConfigChange != nullptr) {
-            onConfigChange();
-        }
+        onConfigChange();
     }
 
     void setup() {
-        WiFi.mode(WIFI_STA);
-
-        // Load preferences
         persistentStore.begin(KEY_CONFIG, true);
         for (int i = 0; i < portalParamCount; i++) {
-            String storedVal = persistentStore.getString(portalParams[i].key, "");
-            strcpy(portalParams[i].value, storedVal.c_str());
+            String storedVal = persistentStore.getString(params[i].key, "");
+            strcpy(params[i].value, storedVal.c_str());
 
-            portalParams[i].paramInstance = new WiFiManagerParameter(
-                portalParams[i].key, portalParams[i].label, portalParams[i].value, portalParams[i].length
+            params[i].paramInstance = new WiFiManagerParameter(
+                params[i].key, params[i].label, params[i].value, params[i].length
             );
-            wifiManager.addParameter(portalParams[i].paramInstance);
+            onAddParameter(params[i].paramInstance);
         }
         persistentStore.end();
-
-        // Menu config
-        const char* menuLayout[] = {"wifi", "info", "param", "sep", "restart"};
-        wifiManager.setMenu(menuLayout, 5);
-        wifiManager.setShowInfoUpdate(false);
-        wifiManager.setTitle(AP_TITLE);
-
-        // WiFiManager config
-        wifiManager.setConfigPortalBlocking(true); // block everything until after the connection is completed
-        wifiManager.setSaveParamsCallback(saveParamsCallback);
-        wifiManager.setConnectTimeout(CONNECT_TIMEOUT_S);
-        wifiManager.setAPStaticIPConfig(AP_IP_ADDRESS, AP_IP_ADDRESS, AP_IP_MASK);
-        wifiManager.setConfigPortalTimeout(180); // in case the connection to the router is interrupted, unless this is set to non-zero it will not attempt to reconnect
-
-        if (!wifiManager.autoConnect(AP_NAME)) {
-            Hardware::log("[Config] WiFi not connected portal timed out, rebooting!");
-            Hardware::printToLCD("WiFi not connected, rebooting!");
-            delay(WIFI_DISCONNECTED_DELAY_S * 1000);
-            wifiManager.reboot();
-        } else {
-            Hardware::log("[Config] WiFi connected!");
-            Hardware::printToLCD("WiFi connected!");
-            isWifiConnected = true;
-            wifiManager.setConfigPortalTimeout(0); // this is no longer needed since the connection is done
-            wifiManager.setConfigPortalBlocking(false); // disable blocking and then start the web server for the config portal
-            wifiManager.startConfigPortal(AP_NAME);
-        }
-    }
-
-    void loop() {
-        if (!isWifiConnected) {
-            return;
-        }
-
-        static unsigned long lastLoop = 0;
-        if (lastLoop == 0 || millis() - lastLoop > LOOP_LIMIT_MS) {
-            wifiManager.process();
-
-            if (!WiFi.isConnected()) {
-                Hardware::log("[Config] WiFi disconnected, rebooting!");
-                Hardware::printToLCD("WiFi disconnected, rebooting!");
-                delay(WIFI_DISCONNECTED_DELAY_S * 1000);
-                wifiManager.reboot();
-            }
-            lastLoop = millis();
-        }
     }
 }
 

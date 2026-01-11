@@ -25,10 +25,7 @@ namespace MqttHandler {
         JsonDocument doc;
         deserializeJson(doc, payload, length);
         Hardware::log("[MQTT] Received message");
-
-        if (onConfigReceived != nullptr) {
-            onConfigReceived(doc);
-        }
+        onConfigReceived(doc);
     }
 
     void subscribeToTopic(const char* topic) {

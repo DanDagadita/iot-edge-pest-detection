@@ -1,17 +1,23 @@
-#include <Arduino.h>
-#include <LiquidCrystal_I2C.h>
-
 #ifndef HARDWARE_H
 #define HARDWARE_H
+
+#include <Arduino.h>
+#include <LiquidCrystal_I2C.h>
+#include <EasyButton.h>
 
 namespace Hardware {
     constexpr int PIN_SENSOR = 32;
     constexpr int PIN_LED = 2;
+    constexpr int PIN_BUTTON = 0;
+    constexpr int BUTTON_RESET_MS = 3000;
     constexpr int SAMPLING_WINDOW_MS = 10;
     constexpr int LCD_COLUMNS = 16;
     constexpr int LCD_ROWS = 2;
 
+    EasyButton button(PIN_BUTTON);
     LiquidCrystal_I2C lcd(0x27, LCD_COLUMNS, LCD_ROWS);
+
+    void (*onButtonPressed)() = nullptr;
 
     void printToLCD(const char* str) {
         if (str == nullptr) return;
@@ -73,16 +79,6 @@ namespace Hardware {
         lcd.print(line2);
     }
 
-    void setup() {
-        Serial.begin(115200);
-        pinMode(PIN_SENSOR, INPUT);
-        pinMode(PIN_LED, OUTPUT);
-        lcd.init();
-        delay(100);
-        printToLCD("Loading...");
-        lcd.backlight();
-    }
-
     inline void log(const char* str) {
         Serial.write(str);
         Serial.write('\n');
@@ -104,6 +100,22 @@ namespace Hardware {
         } else {
             analogWrite(PIN_LED, value);
         }
+    }
+
+    void setup() {
+        Serial.begin(115200);
+        pinMode(PIN_SENSOR, INPUT);
+        pinMode(PIN_LED, OUTPUT);
+        lcd.init();
+        delay(100);
+        printToLCD("Loading...");
+        lcd.backlight();
+        button.begin();
+        button.onPressed(onButtonPressed);
+    }
+
+    void loop() {
+        button.read();
     }
 }
 

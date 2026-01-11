@@ -38,8 +38,8 @@ namespace Detector {
         }
 
         if (!pestClassifier.begin(pestModelTflite)) {
-            Hardware::log("[Detector] Error, could not initialize model");
-            Hardware::printToLCD("Error, could not init model");
+            Hardware::log("[Detector] Error, could't initialize model");
+            Hardware::printToLCD("Error, could't  init model");
             while (1);
         }
     }
@@ -60,9 +60,7 @@ namespace Detector {
         if (prediction > detectionThreshold) {
             Hardware::log("[Detector] PEST DETECTED!");
             Hardware::setIndicator(HIGH, true);
-            if (onDetection != nullptr) {
-                onDetection(prediction, intensity); // 5ms, MQTT publish to telemetry topic
-            }
+            onDetection(prediction, intensity); // 5ms, MQTT publish to telemetry topic
         } else {
             Hardware::setIndicator((int)(intensity * 255.0), false);
         }
