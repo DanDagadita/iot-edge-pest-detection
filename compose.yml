@@ -1,12 +1,13 @@
 services:
-  runtime:
+  pest-detector-jupyter:
+    container_name: pest-detector-jupyter
     image: europe-docker.pkg.dev/colab-images/public/runtime
     ports:
       - "127.0.0.1:9000:8080"
     volumes:
       - ./jupyter_config.py:/root/.jupyter/jupyter_notebook_config.py:ro
-      - ./data:/content/data:ro
-      - ./src:/content/src
+      - ./data/:/content/data/:ro
+      - ./device/src/:/content/src/
     deploy:
       resources:
         reservations:
@@ -14,9 +15,19 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-  # backend:
-  #   build:
-  #     context: ./backend
+  pest-detector-frontend:
+    container_name: pest-detector-frontend
+    build: ./frontend/
+    user: node
+    working_dir: /home/node/app/
+    volumes:
+      - ./frontend/:/home/node/app/
+    command: 'sh -c "npm install && quasar dev"'
+    restart: unless-stopped
+    network_mode: host
+  # pest-detector-backend:
+  #   container_name: pest-detector-backend
+  #   build: ./backend/
   #   env_file:
   #     - ./backend/.env
   #   restart: unless-stopped

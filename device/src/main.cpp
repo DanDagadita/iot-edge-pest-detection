@@ -10,58 +10,64 @@
 
 #ifdef MODE_DETECT
     #include "Config.h"
-    #include "WiFiConfig.h"
+    #include "WifiConfig.h"
     #include "MqttHandler.h"
     #include "Detector.h"
 #endif
 
-void setup() {
-    Hardware::onButtonPressed = WiFiConfig::handleButtonPressed;
-    Hardware::setup();
+//#define SERIAL_DEBUG_BENCH
 
+#include "Arduino.h"
+
+constexpr int LOOP_LIMIT_BENCH_MS = 500;
+
+void setup() {
     #ifdef MODE_COLLECT
-        Collector::setup();
+        Hardware::Setup();
+        Collector::Setup();
     #endif
 
     #ifdef MODE_DETECT
-        Config::onConfigChange = MqttHandler::handleConfigChange;
-        Config::onAddParameter = WiFiConfig::handleAddParameter;
-        WiFiConfig::onParamsSave = Config::handleParamsSave;
-        MqttHandler::onConfigReceived = Detector::handleConfigReceived;
-        Detector::onDetection = MqttHandler::handleDetection;
-        Config::setup();
-        WiFiConfig::setup();
-        MqttHandler::setup();
-        Detector::setup();
+        Hardware::OnButtonPressed = WifiConfig::HandleButtonPressed;
+        Hardware::Setup();
+        Config::OnConfigChange = MqttHandler::HandleConfigChange;
+        Config::OnAddParameter = WifiConfig::HandleAddParameter;
+        WifiConfig::OnParamsSave = Config::HandleParamsSave;
+        MqttHandler::OnConfigReceived = Detector::HandleConfigReceived;
+        Detector::OnDetection = MqttHandler::HandleDetection;
+        Config::Setup();
+        WifiConfig::Setup();
+        MqttHandler::Setup();
+        Detector::Setup();
     #endif
 }
 
 void loop() {
-    Hardware::loop();
-
-    #ifdef MODE_COLLECT
-        unsigned long t0 = micros();
-        Collector::loop();
-        unsigned long t1 = micros();
-
-        //Serial.printf("Collector: %luus\n", (t1 - t0));
-    #endif
+    unsigned long t0 = micros();
+    Hardware::Loop();
+    unsigned long t1 = micros();
 
     #ifdef MODE_DETECT
-        unsigned long t0 = micros();
-        WiFiConfig::loop();
-        unsigned long t1, t2, t3 = micros();
+        unsigned long t2 = t1, t3 = t1;
+        WifiConfig::Loop();
+        t2 = micros();
 
-        if (WiFiConfig::isWifiConnected) {
-            MqttHandler::loop();
-            t2 = micros();
-
-            if (MqttHandler::isMqttConnected) {
-                Detector::loop();
-            }
+        if (WifiConfig::GetIsWiFiConnected()) {
+            MqttHandler::Loop();
             t3 = micros();
         }
 
-        //Serial.printf("Config: %luus | MQTT: %luus | Detector: %luus\n", (t1 - t0), (t2 - t1), (t3 - t2));
+        #ifdef SERIAL_DEBUG_BENCH
+            static unsigned long lastLoop = 0;
+            if (millis() - lastLoop > LOOP_LIMIT_BENCH_MS) {
+                Serial.printf("HW: %luus | Wifi: %luus | MQTT: %luus | Total: %luus\n", 
+                    (t1 - t0), 
+                    (t2 - t1), 
+                    (t3 - t2), 
+                    (micros() - t0)
+                );
+                lastLoop = millis();
+            }
+        #endif
     #endif
 }
