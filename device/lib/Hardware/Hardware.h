@@ -11,7 +11,7 @@ namespace Hardware {
     void PrintToLCD(const char* format, ...);
     void Log(const char* format, ...);
 
-    uint16_t ReadMicrophone();
+    bool GetMicrophoneState();
     void SetIndicator(const int value, const bool isDigital);
 
     void Setup();

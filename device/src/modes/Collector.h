@@ -3,6 +3,7 @@
 
 namespace Collector {
     void Setup();
+    void Loop();
 }
 
 #endif

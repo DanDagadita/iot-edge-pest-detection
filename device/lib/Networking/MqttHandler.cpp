@@ -1,15 +1,17 @@
 #include "MqttHandler.h"
 #include "Hardware.h"
 #include "Config.h"
+#include "neotimer.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Arduino.h>
 
 namespace {
-    constexpr int LOOP_LIMIT_MS = 70;
-    constexpr int LOOP_LIMIT_RECONNECT_MS = 2000;
-    constexpr int CLIENT_TIMEOUT_S = 2;
+    constexpr int TIMER_LOOP_MS = 70;
+    constexpr int TIMER_RECONNECT_MS = 2000;
+    constexpr int MQTT_TIMEOUT_S = 2;
+
     constexpr int JSON_BUFFER_SIZE = 256;
     constexpr int TOPIC_BUFFER_SIZE = 64;
     constexpr int MAC_BUFFER_SIZE = 18;
@@ -71,53 +73,51 @@ namespace {
     }
 }
 
-namespace MqttHandler {
-    void (*OnConfigReceived)(const JsonDocument&) = nullptr;
+void (*MqttHandler::OnConfigReceived)(const JsonDocument&) = nullptr;
 
-    bool GetIsMqttConnected() {
-        return isMqttConnected;
+bool MqttHandler::GetIsMqttConnected() {
+    return isMqttConnected;
+}
+
+void MqttHandler::HandleDetection(const float probability, const float intensity) {
+    if (!isMqttConnected) {
+        return;
     }
 
-    void HandleDetection(const float probability, const float intensity) {
-        if (!isMqttConnected) {
-            return;
-        }
+    JsonDocument doc;
+    doc["probability"] = probability;
+    doc["intensity"] = intensity;
+    char topic[TOPIC_BUFFER_SIZE];
+    snprintf(topic, sizeof(topic), "device/telemetry/%s", deviceMac);
+    publishToTopic(topic, doc);
+}
 
-        JsonDocument doc;
-        doc["probability"] = probability;
-        doc["intensity"] = intensity;
-        char topic[TOPIC_BUFFER_SIZE];
-        snprintf(topic, sizeof(topic), "device/telemetry/%s", deviceMac);
-        publishToTopic(topic, doc);
+void MqttHandler::HandleConfigChange() {
+    if (mqttMessenger.connected()) {
+        mqttMessenger.disconnect();
+    }
+    attemptReconnect();
+}
+
+void MqttHandler::Setup() {
+    strncpy(deviceMac, WiFi.macAddress().c_str(), sizeof(deviceMac));
+    mqttMessenger.setCallback(onMessageReceived);
+    mqttMessenger.setSocketTimeout(MQTT_TIMEOUT_S);
+    networkClient.setTimeout(MQTT_TIMEOUT_S);
+}
+
+void MqttHandler::Loop() {
+    static Neotimer loopTimer(TIMER_LOOP_MS);
+    if (!loopTimer.waiting()) {
+        mqttMessenger.loop();
+        loopTimer.start();
     }
 
-    void HandleConfigChange() {
-        if (mqttMessenger.connected()) {
-            mqttMessenger.disconnect();
+    static Neotimer reconnectTimer(TIMER_RECONNECT_MS);
+    if (!reconnectTimer.waiting()) {
+        if (!mqttMessenger.connected()) {
+            attemptReconnect();
         }
-        attemptReconnect();
-    }
-
-    void Setup() {
-        strncpy(deviceMac, WiFi.macAddress().c_str(), sizeof(deviceMac));
-        mqttMessenger.setCallback(onMessageReceived);
-        mqttMessenger.setSocketTimeout(CLIENT_TIMEOUT_S);
-        networkClient.setTimeout(CLIENT_TIMEOUT_S);
-    }
-
-    void Loop() {
-        static unsigned long lastLoop = 0;
-        if (lastLoop == 0 || millis() - lastLoop > LOOP_LIMIT_MS) {
-            mqttMessenger.loop();
-            lastLoop = millis();
-        }
- 
-        static unsigned long lastLoopReconnect = 0;
-        if (lastLoopReconnect == 0 || millis() - lastLoopReconnect > LOOP_LIMIT_RECONNECT_MS) {
-            if (!mqttMessenger.connected()) {
-                attemptReconnect();
-            }
-            lastLoopReconnect = millis();
-        }
+        reconnectTimer.start();
     }
 }
