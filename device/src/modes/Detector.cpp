@@ -2,7 +2,8 @@
 #include "Detector.h"
 #include "Hardware.h"
 #include "PestModel.h"
-#include "neotimer.h"
+#include "MqttHandler.h"
+#include <neotimer.h>
 #include <EloquentTinyML.h>
 #include <ArduinoJson.h>
 
@@ -45,6 +46,10 @@ namespace {
 
     void detectorTaskCode(void* pvParameters) {
         while (true) {
+            if (!MqttHandler::GetIsMqttConnected()) {
+                continue;
+            }
+
             static int activeSignalTicks = 0;
             static int totalSignalTicks = 0;
 

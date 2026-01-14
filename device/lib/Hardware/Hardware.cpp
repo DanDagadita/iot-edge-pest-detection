@@ -15,15 +15,22 @@ namespace {
 
     EasyButton button(PIN_BUTTON);
     LiquidCrystal_I2C lcd(0x27, LCD_COLUMNS, LCD_ROWS);
+
+    SemaphoreHandle_t lcdMutex = nullptr;
 }
 
 void (*Hardware::OnButtonPressed)() = nullptr;
 
 void Hardware::PrintToLCD(const char* format, ...) {
+    // prevent lcd screen corruption due to printing on two cores at the same time
+    if (xSemaphoreTake(lcdMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        return;
+    }
+
     char buffer[33];
     va_list args;
     va_start(args, format);
-    
+
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
@@ -46,6 +53,7 @@ void Hardware::PrintToLCD(const char* format, ...) {
     lcd.print(line1);
     lcd.setCursor(0, 1);
     lcd.print(line2);
+    xSemaphoreGive(lcdMutex);
 }
 
 void Hardware::Log(const char* format, ...) {
@@ -72,12 +80,17 @@ void Hardware::SetIndicator(const int value, const bool isDigital) {
 
 void Hardware::Setup() {
     Serial.begin(921600);
+
     pinMode(PIN_SENSOR, INPUT);
     pinMode(PIN_LED, OUTPUT);
+
+    lcdMutex = xSemaphoreCreateMutex();
+
     lcd.init();
     delay(100);
     PrintToLCD("Loading...");
     lcd.backlight();
+
     button.begin();
     button.onPressed(OnButtonPressed);
 }
