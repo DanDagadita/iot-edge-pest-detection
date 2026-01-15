@@ -50,7 +50,6 @@ namespace {
     void publishConfig() {
         JsonDocument doc;
         doc["mac"] = deviceMac;
-        doc["token"] = Config::GetSettings().userToken;
         publishToTopic("device/pair", doc);
     }
 

@@ -9,7 +9,6 @@ namespace Config {
         char mqttPort[6];
         char mqttUsername[40];
         char mqttPassword[40];
-        char userToken[64];
     };
 
     extern void (*OnConfigChange)();

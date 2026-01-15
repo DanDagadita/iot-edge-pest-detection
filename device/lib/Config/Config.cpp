@@ -22,7 +22,6 @@ namespace {
         {"mqtt_port", "MQTT Port", 6, settings.mqttPort},
         {"mqtt_username", "MQTT Username", 40, settings.mqttUsername},
         {"mqtt_password", "MQTT Password", 40, settings.mqttPassword},
-        {"user_token", "User Token", 64, settings.userToken}
     };
     const int portalParamCount = sizeof(params) / sizeof(params[0]);
     Preferences persistentStore;

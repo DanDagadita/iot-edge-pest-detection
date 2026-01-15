@@ -18,7 +18,6 @@ namespace {
 
     float featureBuffer[NUMBER_OF_INPUTS];
     float detectionThreshold = 0.9f;
-    unsigned int window = 10;
 
     void handlePrintToLCD(const float prediction, const float intensity) {
         static Neotimer loopTimer(TIMER_LOOP_MS);
@@ -91,10 +90,9 @@ namespace {
 void (*Detector::OnDetection)(const float, const float) = nullptr;
 
 void Detector::HandleConfigReceived(const JsonDocument& doc) {
-    if (doc["threshold"].is<float>() && doc["window"].is<unsigned int>()) {
+    if (doc["threshold"].is<float>()) {
         detectionThreshold = doc["threshold"];
-        window = doc["window"];
-        Hardware::Log("[Detector] Updated threshold %.2f, window %d", detectionThreshold, window);
+        Hardware::Log("[Detector] Updated threshold %.2f", detectionThreshold);
     }
 }
 
