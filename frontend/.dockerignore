@@ -1,0 +1,11 @@
+/.git/
+/.husky/
+/.quasar/
+/.vscode/
+/dist/
+/node_modules/
+/src-capacitor/
+/.editorconfig
+/.gitignore
+/compose.yml
+/README.md

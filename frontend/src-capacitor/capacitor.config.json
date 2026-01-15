@@ -1,0 +1,11 @@
+{
+  "appId": "com.pestdetector.app",
+  "appName": "Pest Detector",
+  "webDir": "www",
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "backgroundColor": "#206361"
+    }
+  }
+}

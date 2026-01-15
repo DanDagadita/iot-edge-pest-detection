@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "npmCommand",
+      "type": "pickString",
+      "description": "Select npm command",
+      "options": [
+        "install",
+        "run lint",
+        "run format",
+        "run dev",
+        "run build",
+        "run build-capacitor-android"
+      ],
+      "default": "run dev"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Run npm command in container",
+      "type": "shell",
+      "command": "docker exec -t pest-detector-frontend npm ${input:npmCommand}",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

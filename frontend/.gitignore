@@ -1,0 +1,9 @@
+/.idea/
+/.quasar/
+/node_modules/
+/src-capacitor/node_modules/
+/src-capacitor/www/
+/src-capacitor/android/.idea/
+/src-capacitor/android/app/release/
+/dist/
+/quasar.config.ts.temporary*

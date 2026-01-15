@@ -1,0 +1,2 @@
+docker exec -t pest-detector-frontend npm run lint
+docker exec -t pest-detector-frontend npm run format

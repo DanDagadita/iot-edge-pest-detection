@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "simonhe.common-intellisense",
+    "ms-azuretools.vscode-containers",
+    "dbaeumer.vscode-eslint",
+    "wayou.vscode-todo-highlight",
+    "gencer.html-slim-scss-css-class-completion",
+    "vue.volar",
+    "editorconfig.editorconfig",
+    "emeraldwalk.runonsave"
+  ]
+}

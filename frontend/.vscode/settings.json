@@ -1,0 +1,16 @@
+{
+  "explorer.autoReveal": false,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.codeActionsOnSave": ["source.fixAll.eslint"],
+  "eslint.validate": ["javascript", "typescript", "vue"],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": ".*\\.(js|ts|vue|scss|html|md|json)$",
+        "cmd": "docker exec -t pest-detector-frontend npm run formatFile -- ${relativeFile}"
+      }
+    ]
+  }
+}
