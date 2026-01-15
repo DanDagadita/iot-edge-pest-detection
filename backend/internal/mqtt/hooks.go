@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"log"
+	"pest-detector/internal/service"
 
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/hooks/auth"
@@ -9,6 +10,7 @@ import (
 
 type DisconnectHook struct {
 	mqtt.HookBase
+	service *service.MQTTService
 }
 
 func (h *DisconnectHook) ID() string {
@@ -20,18 +22,15 @@ func (h *DisconnectHook) Provides(b byte) bool {
 }
 
 func (h *DisconnectHook) OnDisconnect(cl *mqtt.Client, err error, expire bool) {
-	DeviceMutex.Lock()
-	delete(Devices, cl.ID)
-	DeviceMutex.Unlock()
+	h.service.GetDBHandler().UpdateDevice(cl.ID, false, false)
 }
 
-func addHooks(server *mqtt.Server) {
-	// for now, allow all connections
-	if err := server.AddHook(new(auth.AllowHook), nil); err != nil {
+func addHooks(service *service.MQTTService) {
+	if err := service.GetMQTTServer().AddHook(new(auth.AllowHook), nil); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := server.AddHook(new(DisconnectHook), nil); err != nil {
+	if err := service.GetMQTTServer().AddHook(&DisconnectHook{service: service}, nil); err != nil {
 		log.Fatal(err)
 	}
 }

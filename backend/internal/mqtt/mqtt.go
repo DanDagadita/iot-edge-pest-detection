@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"log"
+	"pest-detector/internal/service"
 
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/listeners"
@@ -10,9 +11,11 @@ import (
 const tcpPort = ":1883"
 const wsPort = ":1882"
 
-func Run() *mqtt.Server {
+func Run() *service.MQTTService {
 	server := mqtt.New(&mqtt.Options{InlineClient: true})
-	addHooks(server)
+	mqttService := service.NewMQTTService(server)
+
+	addHooks(mqttService)
 
 	tcp := listeners.NewTCP(listeners.Config{ID: "t1", Address: tcpPort})
 	if err := server.AddListener(tcp); err != nil {
@@ -24,15 +27,18 @@ func Run() *mqtt.Server {
 		log.Fatal(err)
 	}
 
+	go mqttService.StartCleanupRoutine()
+	go mqttService.HandleShutdown()
+
 	go func() {
 		if err := server.Serve(); err != nil {
 			log.Fatal(err)
 		}
 	}()
 
-	if err := subscribeToDeviceTopic(server); err != nil {
+	if err := mqttService.SubscribeToDeviceTopic(); err != nil {
 		log.Fatal(err)
 	}
-
-	return server
+	log.Println("MQTT server started")
+	return mqttService
 }
