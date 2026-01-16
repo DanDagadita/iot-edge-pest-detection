@@ -192,8 +192,8 @@
                 :label-value="`${threshold}%`"
               />
               <div class="row justify-between q-mt-xs">
-                <div class="text-caption text-grey-7">Less sensitive</div>
                 <div class="text-caption text-grey-7">More sensitive</div>
+                <div class="text-caption text-grey-7">Less sensitive</div>
               </div>
             </div>
 
