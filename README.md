@@ -1,5 +1,9 @@
 # IoT Edge Pest Detection
 
+YouTube demo link: [https://youtu.be/gAWUZB2IzyQ](https://youtu.be/gAWUZB2IzyQ)
+
+[See full documentation here](documentation/report.pdf)
+
 ## Setting up
 
 The code expects a generic ESP32 board, connected via USB cable to the computer the flashing will be done from. In order to build and upload the code, I used the PlatformIO extension for VSCode.

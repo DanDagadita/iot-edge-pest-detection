@@ -25,10 +25,10 @@ services:
     command: 'sh -c "npm install && quasar dev"'
     restart: unless-stopped
     network_mode: host
-  # pest-detector-backend:
-  #   container_name: pest-detector-backend
-  #   build: ./backend/
-  #   env_file:
-  #     - ./backend/.env
-  #   restart: unless-stopped
-  #   network_mode: host
+  pest-detector-backend:
+    container_name: pest-detector-backend
+    build: ./backend/
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    network_mode: host
